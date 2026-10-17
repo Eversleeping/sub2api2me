@@ -7376,7 +7376,8 @@
           </div>
         </div>
 
-        <div class="card">
+        <!-- 站点计费模式（单人模式下隐藏） -->
+        <div v-if="!authStore.isSimpleMode" class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
               {{ t('admin.settings.features.siteBillingMode.title') }}
@@ -7500,8 +7501,8 @@
           </div>
         </div>
 
-        <!-- Affiliate (邀请返利) feature card -->
-        <div class="card">
+        <!-- Affiliate (邀请返利) feature card (单人模式下隐藏) -->
+        <div v-if="!authStore.isSimpleMode" class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
               {{ t('admin.settings.features.affiliate.title') }}
@@ -9051,8 +9052,9 @@ import {
 import TotpStepUpDialog from "@/components/auth/TotpStepUpDialog.vue";
 import { affiliatesAPI, type AffiliateAdminEntry, type SimpleUser as AffiliateSimpleUser } from "@/api/admin/affiliates";
 import { extractApiErrorMessage, extractI18nErrorMessage } from "@/utils/apiError";
-import { useAppStore } from "@/stores";
+import { useAppStore, useAuthStore } from "@/stores";
 import { useAdminSettingsStore } from "@/stores/adminSettings";
+const authStore = useAuthStore();
 import { normalizeVisibleMethod } from "@/components/payment/paymentFlow";
 import {
   isRegistrationEmailSuffixDomainValid,
@@ -9101,7 +9103,7 @@ type SettingsTab =
   | "email"
   | "backup";
 const activeTab = ref<SettingsTab>("general");
-const settingsTabs = [
+const allSettingsTabs = [
   { key: "general" as SettingsTab, icon: "home" as const },
   { key: "agreement" as SettingsTab, icon: "document" as const },
   { key: "features" as SettingsTab, icon: "bolt" as const },
@@ -9112,6 +9114,14 @@ const settingsTabs = [
   { key: "email" as SettingsTab, icon: "mail" as const },
   { key: "backup" as SettingsTab, icon: "database" as const },
 ];
+
+// 单人模式下仅展示核心设置标签（过滤用户协议、多用户运营、支付与邮件）
+const settingsTabs = computed(() => {
+  if (authStore.isSimpleMode) {
+    return allSettingsTabs.filter(tab => !['agreement', 'users', 'payment', 'email'].includes(tab.key));
+  }
+  return allSettingsTabs;
+});
 
 const settingsTabKeyboardActions = {
   ArrowLeft: -1,
@@ -9142,19 +9152,20 @@ function handleSettingsTabKeydown(event: KeyboardEvent, tab: SettingsTab): void 
   }
 
   event.preventDefault();
-  const currentIndex = settingsTabs.findIndex((item) => item.key === tab);
+  const tabs = settingsTabs.value;
+  const currentIndex = tabs.findIndex((item) => item.key === tab);
   let nextIndex = currentIndex < 0 ? 0 : currentIndex;
 
   if (action === "first") {
     nextIndex = 0;
   } else if (action === "last") {
-    nextIndex = settingsTabs.length - 1;
+    nextIndex = tabs.length - 1;
   } else {
     nextIndex =
-      (nextIndex + action + settingsTabs.length) % settingsTabs.length;
+      (nextIndex + action + tabs.length) % tabs.length;
   }
 
-  const nextTab = settingsTabs[nextIndex]?.key;
+  const nextTab = tabs[nextIndex]?.key;
   if (!nextTab) {
     return;
   }

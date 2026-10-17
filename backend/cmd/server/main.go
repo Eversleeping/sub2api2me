@@ -74,20 +74,14 @@ func main() {
 		return
 	}
 
-	// Check if setup is needed
+	// 检查是否需要初始配置
 	if setup.NeedsSetup() {
-		// Check if auto-setup is enabled (for Docker deployment)
-		if setup.AutoSetupEnabled() {
-			log.Println("Auto setup mode enabled...")
-			if err := setup.AutoSetupFromEnv(); err != nil {
-				log.Fatalf("Auto setup failed: %v", err)
-			}
-			// Continue to main server after auto-setup
-		} else {
-			log.Println("First run detected, starting setup wizard...")
-			runSetupServer()
+		log.Println("首次运行：启动单人版初始配置服务 (http://0.0.0.0:8080)...")
+		runSetupServer()
+		if setup.NeedsSetup() {
 			return
 		}
+		log.Println("管理员配置完成，正在平滑过渡至主服务器...")
 	}
 
 	// Normal server mode
@@ -125,6 +119,16 @@ func runSetupServer() {
 		IdleTimeout:       120 * time.Second,
 		Protocols:         protocols,
 	}
+
+	// 监听向导完成信号，优雅关闭向导 HTTP 服务并无缝拉起主服务器
+	go func() {
+		<-setup.SetupDoneChan
+		log.Println("Setup installation signal received, closing setup server...")
+		time.Sleep(600 * time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(ctx)
+	}()
 
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("Failed to start setup server: %v", err)

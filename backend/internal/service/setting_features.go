@@ -12,10 +12,21 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/config"
 )
+
+// IsRunModeSimple 检查当前是否运行在单人简易模式
+func (s *SettingService) IsRunModeSimple() bool {
+	return s != nil && s.cfg != nil && s.cfg.RunMode == config.RunModeSimple
+}
 
 // IsRegistrationEnabled 检查是否开放注册
 func (s *SettingService) IsRegistrationEnabled(ctx context.Context) bool {
+	// 单人简易模式下彻底关闭公开注册
+	if s.IsRunModeSimple() {
+		return false
+	}
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyRegistrationEnabled)
 	if err != nil {
 		// 安全默认：如果设置不存在或查询出错，默认关闭注册
@@ -54,6 +65,10 @@ func (s *SettingService) GetRegistrationEmailSuffixWhitelist(ctx context.Context
 
 // IsPromoCodeEnabled 检查是否启用优惠码功能
 func (s *SettingService) IsPromoCodeEnabled(ctx context.Context) bool {
+	// 单人简易模式下关闭优惠码功能
+	if s.IsRunModeSimple() {
+		return false
+	}
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyPromoCodeEnabled)
 	if err != nil {
 		return true // 默认启用
@@ -63,6 +78,10 @@ func (s *SettingService) IsPromoCodeEnabled(ctx context.Context) bool {
 
 // IsInvitationCodeEnabled 检查是否启用邀请码注册功能
 func (s *SettingService) IsInvitationCodeEnabled(ctx context.Context) bool {
+	// 单人简易模式下关闭邀请码功能
+	if s.IsRunModeSimple() {
+		return false
+	}
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyInvitationCodeEnabled)
 	if err != nil {
 		return false // 默认关闭
@@ -81,6 +100,10 @@ func (s *SettingService) GetCustomMenuItemsRaw(ctx context.Context) string {
 
 // IsAffiliateEnabled 检查是否启用邀请返利功能（总开关）
 func (s *SettingService) IsAffiliateEnabled(ctx context.Context) bool {
+	// 单人简易模式下关闭邀请返利分销功能
+	if s.IsRunModeSimple() {
+		return false
+	}
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyAffiliateEnabled)
 	if err != nil {
 		return false // 默认关闭

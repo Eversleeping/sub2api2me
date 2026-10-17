@@ -3,10 +3,9 @@ import { RouterView, useRouter, useRoute } from 'vue-router'
 import { computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import Toast from '@/components/common/Toast.vue'
 import NavigationProgress from '@/components/common/NavigationProgress.vue'
-import AdminComplianceDialog from '@/components/admin/AdminComplianceDialog.vue'
 import { resolveRouteDocumentTitle } from '@/router/title'
 import AnnouncementPopup from '@/components/common/AnnouncementPopup.vue'
-import { useAppStore, useAuthStore, useSubscriptionStore, useAnnouncementStore, useAdminComplianceStore, useAdminSettingsStore } from '@/stores'
+import { useAppStore, useAuthStore, useSubscriptionStore, useAnnouncementStore, useAdminSettingsStore } from '@/stores'
 import { getSetupStatus } from '@/api/setup'
 import { updateFavicon } from '@/utils/branding'
 import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
@@ -18,7 +17,6 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const subscriptionStore = useSubscriptionStore()
 const announcementStore = useAnnouncementStore()
-const adminComplianceStore = useAdminComplianceStore()
 const adminSettingsStore = useAdminSettingsStore()
 
 function updateDocumentTitle() {
@@ -65,11 +63,6 @@ function onVisibilityChange() {
   }
 }
 
-function onAdminComplianceRequired(event: Event) {
-  const detail = (event as CustomEvent<Record<string, string>>).detail || {}
-  adminComplianceStore.requireAcknowledgement(detail)
-}
-
 // 订阅功能开关（opt-out）。关闭后不再预加载/轮询订阅接口；开关在登录后才到达时补启动，反向则清空。
 const subscriptionFeatureEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.subscription))
 
@@ -93,12 +86,6 @@ watch(
   () => authStore.isAuthenticated,
   (isAuthenticated, oldValue) => {
     if (isAuthenticated) {
-      if (authStore.isAdmin) {
-        adminComplianceStore.fetchStatus().catch((error) => {
-          console.error('Failed to fetch admin compliance status:', error)
-        })
-      }
-
       // User logged in: preload subscriptions and start polling (skipped when the
       // subscription feature is switched off; see the flag watcher below)
       if (subscriptionFeatureEnabled.value) {
@@ -120,7 +107,6 @@ watch(
       // User logged out: clear data and stop polling
       subscriptionStore.clear()
       announcementStore.reset()
-      adminComplianceStore.reset()
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
   },
@@ -136,21 +122,25 @@ router.afterEach(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', onVisibilityChange)
-  window.removeEventListener('admin-compliance-required', onAdminComplianceRequired)
 })
 
 onMounted(async () => {
-  window.addEventListener('admin-compliance-required', onAdminComplianceRequired)
-
-  // Check if setup is needed
+  // 首次运行检测：若需要配置则清理本地残留旧凭据并跳转至 /setup
   try {
     const status = await getSetupStatus()
-    if (status.needs_setup && route.path !== '/setup') {
-      router.replace('/setup')
-      return
+    if (status.needs_setup) {
+      ;(window as any).__NEEDS_SETUP__ = true
+      authStore.clearAuth()
+      localStorage.removeItem('auth_token')
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('user')
+      if (route.path !== '/setup') {
+        router.replace('/setup')
+        return
+      }
     }
   } catch {
-    // If setup endpoint fails, assume normal mode and continue
+    // 正常主服务模式下无需跳转
   }
 
   // Load public settings into appStore (will be cached for other components)
@@ -166,5 +156,4 @@ onMounted(async () => {
   <RouterView />
   <Toast />
   <AnnouncementPopup />
-  <AdminComplianceDialog />
 </template>

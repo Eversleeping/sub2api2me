@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"time"
+	_ "time/tzdata" // 嵌入标准 IANA 时区数据库，确保在 Windows 或无 zoneinfo 的环境中正常解析时区
 )
 
 var (

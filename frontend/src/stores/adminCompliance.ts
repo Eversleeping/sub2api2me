@@ -14,8 +14,9 @@ export const useAdminComplianceStore = defineStore('adminCompliance', () => {
   const forceVisible = ref(false)
   let stateVersion = 0
 
-  const required = computed(() => status.value?.required === true)
-  const shouldShow = computed(() => required.value || forceVisible.value)
+  // 单人自用版彻底去除合规确认
+  const required = computed(() => false)
+  const shouldShow = computed(() => false)
   const currentLocale = computed(() => getLocale())
   const expectedPhrase = computed(() => {
     if (currentLocale.value === 'zh') {

@@ -394,8 +394,9 @@ func TestNormalizeRunMode(t *testing.T) {
 		{"simple", "simple"},
 		{"SIMPLE", "simple"},
 		{"standard", "standard"},
-		{"invalid", "standard"},
-		{"", "standard"},
+		// 默认运行模式为单人简易模式 (simple)
+		{"invalid", "simple"},
+		{"", "simple"},
 	}
 
 	for _, tt := range tests {

@@ -7,8 +7,8 @@
       </div>
 
       <template v-else-if="stats">
-        <!-- Row 1: Core Stats -->
-        <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <!-- Row 1: Core Stats (单人模式下自适应3列) -->
+        <div class="grid grid-cols-2 gap-4" :class="authStore.isSimpleMode ? 'lg:grid-cols-3' : 'lg:grid-cols-4'">
           <!-- Total API Keys -->
           <div class="card p-4">
             <div class="flex items-center gap-3">
@@ -74,8 +74,8 @@
             </div>
           </div>
 
-          <!-- New Users Today -->
-          <div class="card p-4">
+          <!-- New Users Today (单人模式下隐藏) -->
+          <div v-if="!authStore.isSimpleMode" class="card p-4">
             <div class="flex items-center gap-3">
               <div class="rounded-lg bg-emerald-100 p-2 dark:bg-emerald-900/30">
                 <Icon name="userPlus" size="md" class="text-emerald-600 dark:text-emerald-400" :stroke-width="2" />
@@ -316,8 +316,8 @@
             <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
           </div>
 
-          <!-- User Usage Trend (Full Width) -->
-          <div class="card p-4">
+          <!-- User Usage Trend (Full Width, 单人模式下隐藏) -->
+          <div v-if="!authStore.isSimpleMode" class="card p-4">
             <div class="mb-4 flex items-center justify-between gap-3">
               <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.dashboard.recentUsage') }} (Top 12)</h3>
               <div class="flex gap-1" role="group" :aria-label="t('admin.dashboard.recentUsage')">
@@ -352,8 +352,10 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
+const authStore = useAuthStore()
 import { adminAPI } from '@/api/admin'
 import type {
   DashboardStats,

@@ -3224,7 +3224,7 @@
         </div>
       </div>
 
-      <div>
+      <div v-if="!isSimpleMode">
         <div class="mb-1 flex items-center gap-2">
           <label class="input-label mb-0">{{ t('admin.accounts.proxy') }}</label>
           <ProxyAdBanner />
@@ -4115,6 +4115,7 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 
 import {
   claudeModels,
@@ -4233,6 +4234,8 @@ interface OAuthFlowExposed {
 }
 
 const { t } = useI18n()
+const authStore = useAuthStore()
+const isSimpleMode = computed(() => authStore.isSimpleMode)
 const browserTimeZone = getBrowserTimeZone()
 
 const oauthStepTitle = computed(() => {

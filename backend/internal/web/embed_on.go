@@ -321,16 +321,19 @@ func ServeEmbeddedFrontend() gin.HandlerFunc {
 			cleanPath = "index.html"
 		}
 
-		if file, err := distFS.Open(cleanPath); err == nil {
-			_ = file.Close()
-			// Try local override first
-			if tryServeOverrideFile(c, overrideDir, cleanPath) {
+		// 对于 index.html 或 SPA 前端路由，统一走 serveIndexHTML 动态注入与无缓存策略
+		if cleanPath != "index.html" {
+			if file, err := distFS.Open(cleanPath); err == nil {
+				_ = file.Close()
+				// 优先检查本地覆盖文件
+				if tryServeOverrideFile(c, overrideDir, cleanPath) {
+					return
+				}
+				applyStaticAssetCacheHeaders(c.Writer.Header(), cleanPath)
+				fileServer.ServeHTTP(c.Writer, c.Request)
+				c.Abort()
 				return
 			}
-			applyStaticAssetCacheHeaders(c.Writer.Header(), cleanPath)
-			fileServer.ServeHTTP(c.Writer, c.Request)
-			c.Abort()
-			return
 		}
 
 		serveIndexHTML(c, distFS)
@@ -401,6 +404,14 @@ func serveIndexHTML(c *gin.Context, fsys fs.FS) {
 		return
 	}
 
+	// 初始配置模式：向 HTML 注入 window.__NEEDS_SETUP__ = true，并设置禁用浏览器缓存响应头
+	headClose := []byte("</head>")
+	setupScript := []byte(`<script>window.__NEEDS_SETUP__=true;</script></head>`)
+	content = bytes.Replace(content, headClose, setupScript, 1)
+
+	c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+	c.Header("Pragma", "no-cache")
+	c.Header("Expires", "0")
 	c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 	c.Abort()
 }

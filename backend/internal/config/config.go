@@ -10,6 +10,7 @@ import (
 	"net/textproto"
 	"net/url"
 	"os"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -1815,7 +1816,8 @@ func NormalizeRunMode(value string) string {
 	case RunModeStandard, RunModeSimple:
 		return normalized
 	default:
-		return RunModeStandard
+		// 默认采用单人自用模式 (RunModeSimple)，关闭多租户与分发特性
+		return RunModeSimple
 	}
 }
 
@@ -2030,14 +2032,19 @@ func configureConfigSource(setConfigFile, addConfigPath func(string)) {
 	if dataDir := strings.TrimSpace(os.Getenv("DATA_DIR")); dataDir != "" {
 		addConfigPath(dataDir)
 	}
-	addConfigPath("/app/data")
+	if runtime.GOOS != "windows" {
+		addConfigPath("/app/data")
+		addConfigPath("/etc/sub2api")
+	}
 	addConfigPath(".")
 	addConfigPath("./config")
-	addConfigPath("/etc/sub2api")
+	addConfigPath("./data")
+	addConfigPath("./backend")
 }
 
 func setDefaults() {
-	viper.SetDefault("run_mode", RunModeStandard)
+	// 默认运行模式设为单人模式 (simple)
+	viper.SetDefault("run_mode", RunModeSimple)
 	viper.SetDefault("gateway.min_output_tokens", 128)
 	viper.SetDefault("simple_mode.auto_create_default_groups", true)
 	viper.SetDefault("simple_mode_key_rate_limit_enabled", false)

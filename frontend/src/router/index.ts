@@ -7,11 +7,8 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import { useAdminSettingsStore } from '@/stores/adminSettings'
-import { useAdminComplianceStore } from '@/stores/adminCompliance'
 import { useNavigationLoadingState } from '@/composables/useNavigationLoading'
 import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
-import { getSetupStatus } from '@/api/setup'
-import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveRouteDocumentTitle } from './title'
 
 /**
@@ -189,7 +186,13 @@ const routes: RouteRecordRaw[] = [
   // ==================== User Routes ====================
   {
     path: '/',
-    redirect: '/home'
+    // 单人模式下：首次部署进入配置向导，配置完成后直接跳转到管理员控制台
+    redirect: () => {
+      if ((window as any).__NEEDS_SETUP__) {
+        return '/setup'
+      }
+      return '/admin/dashboard'
+    }
   },
   {
     path: '/dashboard',
@@ -785,6 +788,17 @@ router.beforeEach(async (to, _from, next) => {
 
   const authStore = useAuthStore()
 
+  // 若处于初始配置向导模式，强制清空旧凭据并将一切请求拦截至 /setup
+  if ((window as any).__NEEDS_SETUP__) {
+    authStore.clearAuth()
+    if (to.path !== '/setup') {
+      next('/setup')
+      return
+    }
+    next()
+    return
+  }
+
   // Restore auth state from localStorage on first navigation (page refresh)
   if (!authInitialized) {
     authStore.checkAuth()
@@ -805,15 +819,9 @@ router.beforeEach(async (to, _from, next) => {
   const requiresAdmin = to.meta.requiresAdmin === true
 
   if (to.path === '/setup') {
-    try {
-      const status = await getSetupStatus()
-      if (!status.needs_setup) {
-        next(resolveCompletedSetupRedirectPath(authStore.isAuthenticated, authStore.isAdmin))
-        return
-      }
-    } catch {
-      // If setup status cannot be determined, keep the setup page reachable.
-    }
+    authStore.clearAuth()
+    next()
+    return
   }
 
   // If route doesn't require auth, allow access
@@ -890,19 +898,7 @@ router.beforeEach(async (to, _from, next) => {
     return
   }
 
-  if (requiresAdmin && authStore.isAdmin) {
-    const adminComplianceStore = useAdminComplianceStore()
-    if (!adminComplianceStore.initialized) {
-      try {
-        await adminComplianceStore.fetchStatus()
-      } catch (error) {
-        const err = error as { status?: number; code?: string; metadata?: Record<string, string> }
-        if (err.status === 423 && err.code === 'ADMIN_COMPLIANCE_ACK_REQUIRED') {
-          adminComplianceStore.requireAcknowledgement(err.metadata)
-        }
-      }
-    }
-  }
+  // 单人自用版无需合规检查，直接放行
 
 
   // 公共设置可能尚未加载（App.vue 的 onMounted 异步拉取晚于首次导航，且纯静态部署
@@ -946,18 +942,31 @@ router.beforeEach(async (to, _from, next) => {
     return
   }
 
-  // 简易模式下限制访问某些页面
+  // 单人简易模式下限制访问所有分发与多人运营页面
   if (authStore.isSimpleMode) {
     const restrictedPaths = [
       '/admin/subscriptions',
       '/admin/redeem',
+      '/admin/promo-codes',
+      '/admin/affiliates',
+      '/admin/orders',
+      '/admin/users',
+      '/admin/proxies',
       '/subscriptions',
-      '/redeem'
+      '/redeem',
+      '/affiliate',
+      '/purchase',
+      '/orders',
+      '/payment',
+      '/register',
+      '/forgot-password',
+      '/reset-password',
+      '/home'
     ]
 
     if (restrictedPaths.some((path) => to.path.startsWith(path))) {
-      // 简易模式下访问受限页面,重定向到仪表板
-      next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+      // 单人模式下受限页面统一重定向到控制台或登录页
+      next(authStore.isAuthenticated ? '/admin/dashboard' : '/login')
       return
     }
   }

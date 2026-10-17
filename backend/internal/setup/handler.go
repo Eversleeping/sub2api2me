@@ -19,6 +19,9 @@ import (
 // installMutex prevents concurrent installation attempts (TOCTOU protection)
 var installMutex sync.Mutex
 
+// SetupDoneChan 在安装成功后关闭，用于通知向导服务器优雅关闭并启动主服务
+var SetupDoneChan = make(chan struct{})
+
 // RegisterRoutes registers setup wizard routes
 func RegisterRoutes(r *gin.Engine) {
 	setup := r.Group("/setup")
@@ -241,8 +244,8 @@ func testRedis(c *gin.Context) {
 
 // InstallRequest represents installation request
 type InstallRequest struct {
-	Database DatabaseConfig `json:"database" binding:"required"`
-	Redis    RedisConfig    `json:"redis" binding:"required"`
+	Database DatabaseConfig `json:"database"`
+	Redis    RedisConfig    `json:"redis"`
 	Admin    AdminConfig    `json:"admin" binding:"required"`
 	Server   ServerConfig   `json:"server"`
 }
@@ -263,6 +266,33 @@ func install(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "Invalid request: "+err.Error())
 		return
+	}
+
+	// 默认填充单人模式数据库与 Redis 配置
+	if strings.TrimSpace(req.Database.Host) == "" {
+		req.Database.Host = "127.0.0.1"
+	}
+	if req.Database.Port == 0 {
+		req.Database.Port = 5432
+	}
+	if strings.TrimSpace(req.Database.User) == "" {
+		req.Database.User = "sub2api"
+	}
+	if req.Database.Password == "" {
+		req.Database.Password = "sub2api_password"
+	}
+	if strings.TrimSpace(req.Database.DBName) == "" {
+		req.Database.DBName = "sub2api"
+	}
+	if strings.TrimSpace(req.Database.SSLMode) == "" {
+		req.Database.SSLMode = "disable"
+	}
+
+	if strings.TrimSpace(req.Redis.Host) == "" {
+		req.Redis.Host = "127.0.0.1"
+	}
+	if req.Redis.Port == 0 {
+		req.Redis.Port = 6379
 	}
 
 	req.Admin.Email = strings.TrimSpace(req.Admin.Email)
@@ -368,6 +398,11 @@ func install(c *gin.Context) {
 	go func() {
 		// Wait a moment to ensure the response is sent
 		time.Sleep(500 * time.Millisecond)
+		select {
+		case <-SetupDoneChan:
+		default:
+			close(SetupDoneChan)
+		}
 		sysutil.RestartServiceAsync()
 	}()
 

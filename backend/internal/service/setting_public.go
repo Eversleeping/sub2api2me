@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 )
 
@@ -299,7 +300,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		balanceLowNotifyThreshold = v
 	}
 
-	return &PublicSettings{
+	res := &PublicSettings{
 		RegistrationEnabled:                 settings[SettingKeyRegistrationEnabled] == "true",
 		EmailVerifyEnabled:                  emailVerifyEnabled,
 		ForceEmailOnThirdPartySignup:        settings[SettingKeyForceEmailOnThirdPartySignup] == "true",
@@ -377,7 +378,23 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		RiskControlEnabled: settings[SettingKeyRiskControlEnabled] == "true",
 
 		AllowUserViewErrorRequests: settings[SettingKeyAllowUserViewErrorRequests] == "true",
-	}, nil
+	}
+
+	// 单人简易模式下强制关闭所有多人分发与客户自助特性
+	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
+		res.BackendModeEnabled = true
+		res.RegistrationEnabled = false
+		res.InvitationCodeEnabled = false
+		res.PasswordResetEnabled = false
+		res.EmailVerifyEnabled = false
+		res.PurchaseSubscriptionEnabled = false
+		res.PaymentEnabled = false
+		res.PaymentBalanceDisabled = true
+		res.SubscriptionEnabled = false
+		res.AffiliateEnabled = false
+	}
+
+	return res, nil
 }
 
 // channelMonitorIntervalMin / channelMonitorIntervalMax bound the default interval

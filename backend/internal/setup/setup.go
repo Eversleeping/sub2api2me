@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -50,19 +51,26 @@ func GetDataDir() string {
 		return dir
 	}
 
-	// Check if /app/data exists and is writable (Docker environment)
-	dockerDataDir := "/app/data"
-	if info, err := os.Stat(dockerDataDir); err == nil && info.IsDir() {
-		// Try to check if writable by creating a temp file
-		testFile := dockerDataDir + "/.write_test"
-		if f, err := os.Create(testFile); err == nil {
-			_ = f.Close()
-			_ = os.Remove(testFile)
-			return dockerDataDir
+	// Check if /app/data exists and is writable (Docker environment on Linux)
+	if runtime.GOOS != "windows" {
+		dockerDataDir := "/app/data"
+		if info, err := os.Stat(dockerDataDir); err == nil && info.IsDir() {
+			// Try to check if writable by creating a temp file
+			testFile := dockerDataDir + "/.write_test"
+			if f, err := os.Create(testFile); err == nil {
+				_ = f.Close()
+				_ = os.Remove(testFile)
+				return dockerDataDir
+			}
 		}
 	}
 
-	// Default to current directory
+	// 若当前工作目录为项目根目录且 backend 目录下已存在配置文件，优先采用 backend 目录
+	if _, err := os.Stat("backend/" + ConfigFileName); err == nil {
+		return "backend"
+	}
+
+	// 默认使用当前目录
 	return "."
 }
 
@@ -362,7 +370,17 @@ func Install(cfg *SetupConfig) error {
 // createInstallLock creates a lock file to prevent re-installation attacks
 func createInstallLock() error {
 	content := fmt.Sprintf("installed_at=%s\n", time.Now().UTC().Format(time.RFC3339))
-	return os.WriteFile(GetInstallLockPath(), []byte(content), 0400) // Read-only for owner
+	err := os.WriteFile(GetInstallLockPath(), []byte(content), 0600)
+	if err != nil {
+		return err
+	}
+	// 同步备份至项目根目录或 backend 目录，保证多路径启动均能感知已安装
+	if _, statErr := os.Stat("bin"); statErr == nil {
+		_ = os.WriteFile("../"+InstallLockFile, []byte(content), 0600)
+	} else if _, statErr := os.Stat("backend"); statErr == nil {
+		_ = os.WriteFile("backend/"+InstallLockFile, []byte(content), 0600)
+	}
+	return nil
 }
 
 func initializeDatabase(cfg *SetupConfig) error {
@@ -529,6 +547,7 @@ func writeConfigFile(cfg *SetupConfig) error {
 
 	// Prepare config for YAML (exclude sensitive data and admin config)
 	yamlConfig := struct {
+		RunMode  string         `yaml:"run_mode"`
 		Server   ServerConfig   `yaml:"server"`
 		Database DatabaseConfig `yaml:"database"`
 		Redis    RedisConfig    `yaml:"redis"`
@@ -544,6 +563,7 @@ func writeConfigFile(cfg *SetupConfig) error {
 		} `yaml:"default"`
 		Timezone string `yaml:"timezone"`
 	}{
+		RunMode:  config.RunModeSimple,
 		Server:   cfg.Server,
 		Database: cfg.Database,
 		Redis:    cfg.Redis,
@@ -573,7 +593,17 @@ func writeConfigFile(cfg *SetupConfig) error {
 		return err
 	}
 
-	return os.WriteFile(GetConfigFilePath(), data, 0600)
+	err = os.WriteFile(GetConfigFilePath(), data, 0600)
+	if err != nil {
+		return err
+	}
+	// 同步备份至项目根目录或 backend 目录，保证无论从哪个目录启动都能读取
+	if _, statErr := os.Stat("bin"); statErr == nil {
+		_ = os.WriteFile("../"+ConfigFileName, data, 0600)
+	} else if _, statErr := os.Stat("backend"); statErr == nil {
+		_ = os.WriteFile("backend/"+ConfigFileName, data, 0600)
+	}
+	return nil
 }
 
 func generateSecret(length int) (string, error) {
@@ -627,15 +657,15 @@ func AutoSetupFromEnv() error {
 	// Build config from environment variables
 	cfg := &SetupConfig{
 		Database: DatabaseConfig{
-			Host:     getEnvOrDefault("DATABASE_HOST", "localhost"),
+			Host:     getEnvOrDefault("DATABASE_HOST", "127.0.0.1"),
 			Port:     getEnvIntOrDefault("DATABASE_PORT", 5432),
-			User:     getEnvOrDefault("DATABASE_USER", "postgres"),
-			Password: getEnvOrDefault("DATABASE_PASSWORD", ""),
+			User:     getEnvOrDefault("DATABASE_USER", "sub2api"),
+			Password: getEnvOrDefault("DATABASE_PASSWORD", "sub2api_password"),
 			DBName:   getEnvOrDefault("DATABASE_DBNAME", "sub2api"),
 			SSLMode:  getEnvOrDefault("DATABASE_SSLMODE", "disable"),
 		},
 		Redis: RedisConfig{
-			Host:      getEnvOrDefault("REDIS_HOST", "localhost"),
+			Host:      getEnvOrDefault("REDIS_HOST", "127.0.0.1"),
 			Port:      getEnvIntOrDefault("REDIS_PORT", 6379),
 			Username:  getEnvOrDefault("REDIS_USERNAME", ""),
 			Password:  getEnvOrDefault("REDIS_PASSWORD", ""),
@@ -643,8 +673,8 @@ func AutoSetupFromEnv() error {
 			EnableTLS: getEnvOrDefault("REDIS_ENABLE_TLS", "false") == "true",
 		},
 		Admin: AdminConfig{
-			Email:    getEnvOrDefault("ADMIN_EMAIL", ""),
-			Password: getEnvOrDefault("ADMIN_PASSWORD", ""),
+			Email:    getEnvOrDefault("ADMIN_EMAIL", "admin@sub2api.local"),
+			Password: getEnvOrDefault("ADMIN_PASSWORD", "admin123456"),
 		},
 		Server: ServerConfig{
 			Host: getEnvOrDefault("SERVER_HOST", "0.0.0.0"),

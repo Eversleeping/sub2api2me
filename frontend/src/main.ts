@@ -35,6 +35,13 @@ async function bootstrap() {
   initThemeClass()
   initIOSViewportZoomFix()
 
+  // 若处于初始配置向导模式，在挂载应用前彻底清除本地可能残留的旧凭据
+  if ((window as any).__NEEDS_SETUP__) {
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('user')
+  }
+
   const app = createApp(App)
   const pinia = createPinia()
   app.use(pinia)

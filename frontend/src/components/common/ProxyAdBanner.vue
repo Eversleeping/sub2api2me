@@ -1,5 +1,6 @@
 <template>
   <a
+    v-if="!authStore.isSimpleMode"
     class="inline-flex max-w-full shrink-0 items-center gap-1 truncate text-xs font-normal text-primary-600 transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-2 dark:text-primary-400 dark:focus:ring-offset-dark-800"
     href="https://sub2api.io/proxyip"
     target="_blank"
@@ -12,7 +13,9 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { useAuthStore } from '@/stores/auth'
 import Icon from '@/components/icons/Icon.vue'
 
 const { t } = useI18n()
+const authStore = useAuthStore()
 </script>
