@@ -53,6 +53,18 @@
         <!-- Language Switcher -->
         <LocaleSwitcher />
 
+        <!-- 主题切换 (白色系 <-> 暗黑极客系，默认白色系) -->
+        <button
+          type="button"
+          @click="toggleTheme"
+          :title="isDark ? t('home.switchToLight') : t('home.switchToDark')"
+          :aria-label="isDark ? t('home.switchToLight') : t('home.switchToDark')"
+          class="group flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white transition-all duration-200 active:scale-90"
+        >
+          <Icon v-if="isDark" name="sun" size="sm" class="text-amber-500 transition-transform duration-300 group-hover:rotate-45" />
+          <Icon v-else name="moon" size="sm" class="transition-transform duration-300 group-hover:-rotate-12" />
+        </button>
+
         <!-- Subscription Progress (for users with active subscriptions; not mounted at all when the feature is off) -->
         <SubscriptionProgressMini v-if="user && subscriptionFeatureEnabled" />
 
@@ -265,6 +277,7 @@ import { sanitizeUrl } from '@/utils/url'
 import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 import { resolveRouteMetaKeys } from '@/router/title'
 import { resolveSiteBillingMode } from '@/utils/siteBillingMode'
+import { useTheme } from '@/composables/useTheme'
 
 const router = useRouter()
 const route = useRoute()
@@ -273,6 +286,9 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const adminSettingsStore = useAdminSettingsStore()
 const onboardingStore = useOnboardingStore()
+
+// 全局主题状态管理（默认白色系，支持在顶栏快捷切换）
+const { isDark, toggleTheme } = useTheme()
 
 const user = computed(() => authStore.user)
 const dropdownOpen = ref(false)

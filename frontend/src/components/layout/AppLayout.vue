@@ -1,8 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-dark-950">
-    <!-- Background Decoration -->
-    <div class="pointer-events-none fixed inset-0 bg-mesh-gradient"></div>
-
+  <div class="min-h-screen bg-[#fafafa] text-zinc-900 transition-colors duration-200 dark:bg-[#09090b] dark:text-zinc-100">
     <!-- Sidebar -->
     <AppSidebar />
 

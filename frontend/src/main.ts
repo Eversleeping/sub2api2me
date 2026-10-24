@@ -24,9 +24,8 @@ function initIOSViewportZoomFix() {
 
 function initThemeClass() {
   const savedTheme = localStorage.getItem('theme')
-  const shouldUseDark =
-    savedTheme === 'dark' ||
-    (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)
+  // 极简方案：默认采用白色系，仅当用户显式存储为 'dark' 时才启用深色模式
+  const shouldUseDark = savedTheme === 'dark'
   document.documentElement.classList.toggle('dark', shouldUseDark)
 }
 
