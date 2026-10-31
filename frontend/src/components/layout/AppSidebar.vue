@@ -152,12 +152,12 @@
       <!-- Theme Toggle -->
       <button
         @click="toggleTheme"
-        class="sidebar-link mb-2 w-full"
+        class="sidebar-link group mb-2 w-full active:scale-[0.98]"
         :class="{ 'sidebar-link-collapsed': sidebarCollapsed }"
         :title="sidebarCollapsed ? (isDark ? t('nav.lightMode') : t('nav.darkMode')) : undefined"
       >
-        <SunIcon v-if="isDark" class="h-5 w-5 flex-shrink-0 text-amber-500" />
-        <MoonIcon v-else class="h-5 w-5 flex-shrink-0" />
+        <SunIcon v-if="isDark" class="h-5 w-5 flex-shrink-0 text-amber-500 transition-transform duration-300 group-hover:rotate-45" />
+        <MoonIcon v-else class="h-5 w-5 flex-shrink-0 transition-transform duration-300 group-hover:-rotate-12" />
         <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{
           isDark ? t('nav.lightMode') : t('nav.darkMode')
         }}</span>
@@ -199,6 +199,7 @@ import { sanitizeUrl } from '@/utils/url'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
 import { resolveSiteBillingMode } from '@/utils/siteBillingMode'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
+import { useTheme } from '@/composables/useTheme'
 
 interface NavItem {
   path: string
@@ -250,7 +251,8 @@ const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const mobileOpen = computed(() => appStore.mobileOpen)
 const isAdmin = computed(() => authStore.isAdmin)
 const sidebarNavRef = ref<HTMLElement | null>(null)
-const isDark = ref(document.documentElement.classList.contains('dark'))
+// 使用全局统一的主题管理（默认白色系，支持自由切换）
+const { isDark, toggleTheme } = useTheme()
 
 const homePath = computed(() => (isAdmin.value ? '/admin/dashboard' : '/dashboard'))
 
@@ -864,12 +866,6 @@ function toggleSidebar() {
   appStore.toggleSidebar()
 }
 
-function toggleTheme() {
-  isDark.value = !isDark.value
-  document.documentElement.classList.toggle('dark', isDark.value)
-  localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
-}
-
 function closeMobile() {
   appStore.setMobileOpen(false)
 }
@@ -931,16 +927,6 @@ function handleGroupClick(item: NavItem) {
     router.push(item.path)
   }
   groupExpandOverrides.value.set(item.path, true)
-}
-
-// Initialize theme
-const savedTheme = localStorage.getItem('theme')
-if (
-  savedTheme === 'dark' ||
-  (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)
-) {
-  isDark.value = true
-  document.documentElement.classList.add('dark')
 }
 
 // Fetch admin settings (for feature-gated nav items like Ops).

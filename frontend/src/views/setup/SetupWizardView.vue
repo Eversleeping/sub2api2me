@@ -1,21 +1,21 @@
 <template>
   <div
-    class="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4 dark:from-dark-900 dark:to-dark-800"
+    class="flex min-h-screen items-center justify-center bg-[#fafafa] p-4 text-zinc-900 dark:bg-[#09090b] dark:text-zinc-100"
   >
     <div class="w-full max-w-xl">
       <!-- 头部 Logo 与标题 -->
       <div class="mb-8 text-center">
         <div
-          class="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 shadow-lg"
+          class="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-zinc-950 text-white shadow-sm dark:bg-white dark:text-zinc-950"
         >
-          <Icon name="cog" size="xl" class="text-white" />
+          <Icon name="cog" size="lg" />
         </div>
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Sub2API 初始配置</h1>
-        <p class="mt-2 text-gray-500 dark:text-dark-400">单人专属自用版 · 首次部署仅需设置管理员账号</p>
+        <h1 class="text-2xl font-bold tracking-tight text-zinc-950 dark:text-white">Sub2API 初始配置</h1>
+        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">单人专属自用版 · 首次部署设置管理员账号</p>
       </div>
 
       <!-- 单页配置卡片 -->
-      <div class="rounded-2xl bg-white p-8 shadow-xl dark:bg-dark-800">
+      <div class="rounded-xl border border-zinc-200/90 bg-white p-6 shadow-sm sm:p-8 dark:border-dark-700 dark:bg-dark-900">
         <div class="space-y-6">
           <div class="mb-6 text-center">
             <h2 class="text-xl font-semibold text-gray-900 dark:text-white">

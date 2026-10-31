@@ -168,11 +168,69 @@ func skipSetupEnabled() bool {
 	}
 }
 
+// hasDatabaseConfigured 检查本地配置文件是否存在并且包含基本的数据库连接配置
+func hasDatabaseConfigured() (*DatabaseConfig, bool) {
+	configPath := GetConfigFilePath()
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, false
+	}
+	var cfg struct {
+		Database DatabaseConfig `yaml:"database"`
+	}
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, false
+	}
+	if cfg.Database.Host == "" || cfg.Database.Port == 0 || cfg.Database.DBName == "" {
+		return nil, false
+	}
+	if cfg.Database.SSLMode == "" {
+		cfg.Database.SSLMode = "disable"
+	}
+	return &cfg.Database, true
+}
+
+// hasAdminUser 检查当前数据库中是否已经初始化并存在至少一个管理员账号。
+func hasAdminUser() bool {
+	dbCfg, ok := hasDatabaseConfigured()
+	if !ok {
+		return false
+	}
+	dsn := fmt.Sprintf(
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s connect_timeout=3",
+		dbCfg.Host, dbCfg.Port, dbCfg.User,
+		dbCfg.Password, dbCfg.DBName, dbCfg.SSLMode,
+	)
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = db.Close() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var count int64
+	err = db.QueryRowContext(ctx, "SELECT COUNT(1) FROM users WHERE role = $1", service.RoleAdmin).Scan(&count)
+	if err != nil {
+		return false
+	}
+	return count > 0
+}
+
 // NeedsSetup checks if the system needs initial setup
 // Uses multiple checks to prevent attackers from forcing re-setup by deleting config
 func NeedsSetup() bool {
 	if skipSetupEnabled() {
 		logger.L().Debug("setup.needs_setup_bypassed", zap.String("reason", "skip_setup_enabled"))
+		return false
+	}
+
+	// 1. 若数据库已配置，但数据库中尚无任何管理员账号（如全新部署环境），必须进入向导完成设置
+	if _, ok := hasDatabaseConfigured(); ok {
+		if !hasAdminUser() {
+			return true
+		}
 		return false
 	}
 
