@@ -30,7 +30,7 @@ function toggleTheme() {
 
   // 若浏览器支持 View Transitions API，提供平滑交叉过渡
   if (typeof document !== 'undefined' && 'startViewTransition' in document) {
-    ;(document as any).startViewTransition(() => {
+    (document as any).startViewTransition(() => {
       isDark.value = nextDark
       applyTheme(nextDark)
     })

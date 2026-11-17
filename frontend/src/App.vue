@@ -129,7 +129,7 @@ onMounted(async () => {
   try {
     const status = await getSetupStatus()
     if (status.needs_setup) {
-      ;(window as any).__NEEDS_SETUP__ = true
+      (window as any).__NEEDS_SETUP__ = true
       authStore.clearAuth()
       localStorage.removeItem('auth_token')
       localStorage.removeItem('refresh_token')

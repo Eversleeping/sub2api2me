@@ -65,8 +65,8 @@ func TestMCPToolCallsConsumeGlobalBudgetOnce(t *testing.T) {
 		status     int
 	}{
 		{service.RoleUser, "user_get_api_key", map[string]any{"id": 9}, http.StatusOK},
-		// The compliance response proves the request passed the admin limiter.
-		{service.RoleAdmin, "admin_get_dashboard", map[string]any{}, http.StatusLocked},
+		// The dashboard response proves the request passed the admin limiter.
+		{service.RoleAdmin, "admin_get_dashboard", map[string]any{}, http.StatusOK},
 	} {
 		t.Run(tc.role, func(t *testing.T) {
 			endpoint, token, mr := newMCPRateLimitEndpoint(t, tc.role, 2)

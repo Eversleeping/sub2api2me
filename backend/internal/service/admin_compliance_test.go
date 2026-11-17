@@ -54,12 +54,12 @@ func (r *adminComplianceRepoStub) Delete(ctx context.Context, key string) error 
 	return nil
 }
 
-func TestAdminComplianceStatusRequiresAckWhenMissing(t *testing.T) {
+func TestAdminComplianceStatusNotRequiredForPersonalEdition(t *testing.T) {
 	svc := NewSettingService(&adminComplianceRepoStub{}, &config.Config{})
 
 	status, err := svc.GetAdminComplianceStatus(context.Background(), 1)
 	require.NoError(t, err)
-	require.True(t, status.Required)
+	require.False(t, status.Required)
 	require.Equal(t, AdminComplianceVersion, status.Version)
 	require.Equal(t, AdminComplianceAckPhraseZH, status.AckPhraseZH)
 	require.Equal(t, AdminComplianceDocumentPathZH, status.DocumentPathZH)
@@ -77,7 +77,7 @@ func TestAcceptAdminComplianceRejectsWrongPhrase(t *testing.T) {
 	require.True(t, errors.Is(err, ErrAdminComplianceInvalidPhrase))
 }
 
-func TestAcceptAdminCompliancePersistsCurrentVersion(t *testing.T) {
+func TestAcceptAdminCompliancePersistsOptionalAcknowledgement(t *testing.T) {
 	repo := &adminComplianceRepoStub{}
 	svc := NewSettingService(repo, &config.Config{})
 
@@ -90,17 +90,18 @@ func TestAcceptAdminCompliancePersistsCurrentVersion(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.False(t, status.Required)
-	require.NotNil(t, status.Acknowledgement)
-	require.Equal(t, int64(42), status.Acknowledgement.AdminUserID)
-	require.Equal(t, "203.0.113.10", status.Acknowledgement.IPAddress)
+	require.Nil(t, status.Acknowledgement)
 
 	var stored AdminComplianceAcknowledgement
 	require.NoError(t, json.Unmarshal([]byte(repo.values[adminComplianceAcknowledgementKey(42)]), &stored))
+	require.Equal(t, int64(42), stored.AdminUserID)
+	require.Equal(t, "203.0.113.10", stored.IPAddress)
+	require.Equal(t, "test-agent", stored.UserAgent)
 	require.Equal(t, AdminComplianceVersion, stored.Version)
 	require.Equal(t, AdminComplianceDocumentPathZH, stored.DocumentZH)
 }
 
-func TestAdminComplianceStatusRequiresAckOnOldVersion(t *testing.T) {
+func TestAdminComplianceStatusAllowsOldAcknowledgementInPersonalEdition(t *testing.T) {
 	old, err := json.Marshal(AdminComplianceAcknowledgement{Version: "v2026.01.01"})
 	require.NoError(t, err)
 	svc := NewSettingService(&adminComplianceRepoStub{
@@ -109,11 +110,11 @@ func TestAdminComplianceStatusRequiresAckOnOldVersion(t *testing.T) {
 
 	status, err := svc.GetAdminComplianceStatus(context.Background(), 1)
 	require.NoError(t, err)
-	require.True(t, status.Required)
+	require.False(t, status.Required)
 	require.Nil(t, status.Acknowledgement)
 }
 
-func TestAdminComplianceStatusIsPerAdminUser(t *testing.T) {
+func TestAdminComplianceStatusAllowsAllPersonalAdmins(t *testing.T) {
 	current, err := json.Marshal(AdminComplianceAcknowledgement{
 		Version:     AdminComplianceVersion,
 		AdminUserID: 1,
@@ -129,5 +130,5 @@ func TestAdminComplianceStatusIsPerAdminUser(t *testing.T) {
 
 	statusForUserTwo, err := svc.GetAdminComplianceStatus(context.Background(), 2)
 	require.NoError(t, err)
-	require.True(t, statusForUserTwo.Required)
+	require.False(t, statusForUserTwo.Required)
 }

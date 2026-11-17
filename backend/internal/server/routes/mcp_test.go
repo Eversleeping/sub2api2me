@@ -10,18 +10,30 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler"
+	adminhandler "github.com/Wei-Shaw/sub2api/internal/handler/admin"
 	"github.com/Wei-Shaw/sub2api/internal/managementmcp"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
 
+type mcpRouteDashboardRepo struct {
+	service.UsageLogRepository
+}
+
+func (r *mcpRouteDashboardRepo) GetDashboardStats(context.Context) (*usagestats.DashboardStats, error) {
+	return &usagestats.DashboardStats{}, nil
+}
+
 func mcpRouteHandlers() *handler.Handlers {
 	// Nil method receivers are sufficient for route registration. Individual
 	// behavior tests populate only the handlers whose dependencies they exercise.
 	return &handler.Handlers{
-		Admin:    &handler.AdminHandlers{},
+		Admin: &handler.AdminHandlers{
+			Dashboard: adminhandler.NewDashboardHandler(service.NewDashboardService(&mcpRouteDashboardRepo{}, nil, nil, &config.Config{}), nil),
+		},
 		MCPOAuth: handler.NewMCPOAuthHandler(nil, nil, nil, nil, &config.Config{MCP: config.MCPConfig{PublicURL: "https://platform.example/api/v1/mcp"}}),
 	}
 }
@@ -185,7 +197,7 @@ func (r *mcpRouteSettingsRepo) SetMultiple(_ context.Context, values map[string]
 	return nil
 }
 
-func TestMCPDispatchRetainsBackendModeAndAdminCompliance(t *testing.T) {
+func TestMCPDispatchRetainsBackendModeAndAllowsPersonalAdmin(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	settings := service.NewSettingService(&mcpRouteSettingsRepo{values: map[string]string{}}, &config.Config{})
 	// UpdateSettings also updates the global backend-mode cache. Reset it on
@@ -203,7 +215,7 @@ func TestMCPDispatchRetainsBackendModeAndAdminCompliance(t *testing.T) {
 
 	admin := &service.MCPPrincipal{GrantID: "admin", UserID: 8, Role: service.RoleAdmin, Scope: service.MCPScopeAdmin, ReadOnly: true}
 	result = callMCPRouteTool(t, newMCPRouteTestEndpoint(h, admin, settings, middleware.AuditLogMiddleware(mcpRouteNext)), "admin_get_dashboard", map[string]any{})
-	require.True(t, result.Result.IsError)
-	require.Equal(t, http.StatusLocked, result.Result.Payload.HTTPStatus)
-	require.Contains(t, string(result.Result.Payload.Result), "ADMIN_COMPLIANCE_ACK_REQUIRED")
+	require.False(t, result.Result.IsError)
+	require.Equal(t, http.StatusOK, result.Result.Payload.HTTPStatus)
+	require.Contains(t, string(result.Result.Payload.Result), "total_users")
 }
